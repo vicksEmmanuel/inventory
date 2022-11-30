@@ -11,6 +11,10 @@ import express from "express";
 import "reflect-metadata";
 import { buildSchema } from "type-graphql";
 import { resolvers } from "./resolvers";
+import { connectToMongo } from "./utils/mongo";
+import { verifyJwt } from "./utils/jwt";
+import { User } from "./schema/user.schema";
+import { Context } from "./types/context";
 
 async function bootstrap() {
   const schema = await buildSchema({
@@ -22,7 +26,14 @@ async function bootstrap() {
   app.use(cookieParser());
   const server = new ApolloServer({
     schema,
-    context: (ctx) => ctx,
+    context: (ctx: Context) => {
+      const context = ctx;
+      if (ctx.req.cookies.accessToken) {
+        const user = verifyJwt<User>(ctx.req.cookies.accessToken);
+        context.user = user;
+      }
+      return context;
+    },
     plugins: [
       process.env.NODE_ENV === "production"
         ? ApolloServerPluginLandingPageProductionDefault()
@@ -36,6 +47,7 @@ async function bootstrap() {
   app.listen({ port: 4000 }, () => {
     console.log("App is listening on https://localhost:4000");
   });
+  connectToMongo();
 }
 
 bootstrap();
